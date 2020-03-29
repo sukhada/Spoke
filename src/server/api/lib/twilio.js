@@ -182,6 +182,7 @@ async function sendMessage(message, contact, trx, organization) {
     organization,
     contact
   );
+
   const subAccountSid = await cacheableData.organization.getSubAccountSid(
     organization
   );
@@ -192,7 +193,9 @@ async function sendMessage(message, contact, trx, organization) {
     "Sub-account SID",
     subAccountSid,
     "sub-account auth token",
-    subAccountAuthToken
+    subAccountAuthToken,
+    "organization",
+    organization
   );
 
   const campaignId = contact.campaign_id;
