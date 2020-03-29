@@ -1,6 +1,7 @@
 import Twilio from "twilio";
 import { getFormattedPhoneNumber } from "../../../lib/phone-format";
 import {
+  Campaign,
   Log,
   Message,
   PendingMessagePart,
@@ -18,6 +19,7 @@ import { getLastMessage, saveNewIncomingMessage } from "./message-sending";
 
 let twilio = null;
 let twilioSubAccountSidToClient = {};
+let campaignIdToMessagingServiceSid = {};
 const MAX_SEND_ATTEMPTS = 5;
 const MESSAGE_VALIDITY_PADDING_SECONDS = 30;
 const MAX_TWILIO_MESSAGE_VALIDITY = 14400;
@@ -155,8 +157,7 @@ function parseMessageText(message) {
   return params;
 }
 
-// TODO(arathi1): Pass in campaign
-async function sendMessage(message, contact, trx, organization, campaign) {
+async function sendMessage(message, contact, trx, organization) {
   const APIERRORTEST = /apierrortest/.test(message.text);
   if (!twilio && !APIERRORTEST) {
     log.warn(
@@ -184,6 +185,14 @@ async function sendMessage(message, contact, trx, organization, campaign) {
   const subAccountSid = await cacheableData.organization.getSubAccountSid(
     organization
   );
+
+  const campaignId = contact.campaign_id;
+  if (!campaignIdToMessagingServiceSid[campaignId]) {
+    const campaign = await Campaign.get(campaignId);
+    campaignIdToMessagingServiceSid[campaignId] =
+      campaign.messaging_service_sid;
+  }
+
   return new Promise((resolve, reject) => {
     if (message.service !== "twilio") {
       log.warn("Message not marked as a twilio message", message.id);
@@ -221,7 +230,7 @@ async function sendMessage(message, contact, trx, organization, campaign) {
     }
     const changes = {};
 
-    const messagingServiceSid = campaign.messaging_service_sid;
+    const messagingServiceSid = campaignIdToMessagingServiceSid[campaignId];
     console.log("Campaign messaging service sid", messagingServiceSid);
     changes.messageservice_sid = messagingServiceSid;
 
@@ -230,7 +239,6 @@ async function sendMessage(message, contact, trx, organization, campaign) {
         to: message.contact_number,
         body: message.text,
         messagingServiceSid: messagingServiceSid,
-        accountSid: subAccountSid,
         statusCallback: process.env.TWILIO_STATUS_CALLBACK_URL
       },
       twilioValidityPeriod ? { validityPeriod: twilioValidityPeriod } : {},
