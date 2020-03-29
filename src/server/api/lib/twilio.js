@@ -185,6 +185,9 @@ async function sendMessage(message, contact, trx, organization) {
   const subAccountSid = await cacheableData.organization.getSubAccountSid(
     organization
   );
+  const subAccountAuthToken = await cacheableData.organization.getSubAccountAuthToken(
+    organization
+  );
 
   const campaignId = contact.campaign_id;
   if (!campaignIdToMessagingServiceSid[campaignId]) {
@@ -265,9 +268,8 @@ async function sendMessage(message, contact, trx, organization) {
     } else {
       if (!twilioSubAccountSidToClient[subAccountSid]) {
         twilioSubAccountSidToClient[subAccountSid] = Twilio(
-          process.env.TWILIO_API_KEY,
-          process.env.TWILIO_AUTH_TOKEN,
-          { accountSid: subAccountSid }
+          subAccountSid,
+          subAccountAuthToken
         );
       }
       twilioSubAccountSidToClient[subAccountSid].messages.create(
