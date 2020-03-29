@@ -4,6 +4,7 @@ import {
   Campaign,
   Log,
   Message,
+  Organization,
   PendingMessagePart,
   r,
   cacheableData
