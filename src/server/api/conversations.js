@@ -205,12 +205,13 @@ export async function getConversations(
     organizationId,
     campaignsFilter,
     assignmentsFilter,
+    tagsFilter,
     contactsFilter
   );
   const pageInfo = {
     limit: cursor.limit,
     offset: cursor.offset,
-    total: conversationsCountArray[0].count
+    total: conversationsCountArray[0]["count(*)"]
   };
 
   return {

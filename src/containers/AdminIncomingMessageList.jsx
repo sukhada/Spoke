@@ -57,14 +57,18 @@ function getContactsFilterForConversationOptOutStatus(
   return {};
 }
 
+/* Initialized as objects to later facillitate shallow comparison */
+const initialCampaignsFilter = { isArchived: false };
+const initialContactsFilter = { isOptedOut: false };
+const initialAssignmentsFilter = {};
+const initialTagsFilter = {
+  excludeEscalated: false,
+  escalatedConvosOnly: false
+};
+
 export class AdminIncomingMessageList extends Component {
   constructor(props) {
     super(props);
-
-    const initialTagsFilter = {
-      excludeEscalated: false,
-      escalatedConvosOnly: false
-    };
 
     const tagsFilter = props.escalatedConvosOnly
       ? Object.assign({}, initialTagsFilter, {
@@ -76,12 +80,12 @@ export class AdminIncomingMessageList extends Component {
     this.state = {
       page: 0,
       pageSize: 10,
-      campaignsFilter: { isArchived: false },
-      contactsFilter: { isOptedOut: false },
-      assignmentsFilter: {},
+      campaignsFilter: initialCampaignsFilter,
+      contactsFilter: initialContactsFilter,
+      assignmentsFilter: initialAssignmentsFilter,
       tagsFilter: tagsFilter,
+      contactNameFilter: undefined,
       needsRender: false,
-      utc: Date.now().toString(),
       campaigns: [],
       reassignmentTexters: [],
       campaignTexters: [],
@@ -90,7 +94,9 @@ export class AdminIncomingMessageList extends Component {
       includeActiveCampaigns: true,
       includeNotOptedOutConversations: true,
       includeOptedOutConversations: false,
-      clearSelectedMessages: false
+      selectedRows: [],
+      campaignIdsContactIds: [],
+      reassignmentAlert: undefined
     };
   }
 

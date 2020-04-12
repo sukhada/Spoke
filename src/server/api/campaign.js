@@ -86,11 +86,10 @@ export async function getCampaigns(organizationId, cursor, campaignsFilter) {
     );
 
     const campaignsCountArray = await campaignsCountQuery;
-
     const pageInfo = {
       limit: cursor.limit,
       offset: cursor.offset,
-      total: campaignsCountArray[0].count
+      total: campaignsCountArray[0]["count(*)"]
     };
     return {
       campaigns,
