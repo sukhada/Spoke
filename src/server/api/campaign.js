@@ -53,11 +53,6 @@ export function buildCampaignQuery(
   }
 
   query = query.where("campaign.organization_id", organizationId);
-  query = query.leftJoin(
-    "campaign_admin",
-    "campaign_admin.campaign_id",
-    "campaign.id"
-  );
   query = addCampaignsFilterToQuery(query, campaignsFilter);
 
   return query;
