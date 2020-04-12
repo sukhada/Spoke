@@ -84,7 +84,7 @@ export async function getCampaigns(organizationId, cursor, campaignsFilter) {
       organizationId,
       campaignsFilter
     );
-
+    console.log("campaignsCountArray", campaignsCountArray[0]);
     const campaignsCountArray = await campaignsCountQuery;
     const pageInfo = {
       limit: cursor.limit,
