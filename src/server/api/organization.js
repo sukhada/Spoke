@@ -44,6 +44,14 @@ export const resolvers = {
         : process.env.OPT_OUT_MESSAGE) ||
       "I'm opting you out of texts immediately. Have a great day.",
     textingHoursStart: organization => organization.texting_hours_start,
-    textingHoursEnd: organization => organization.texting_hours_end
+    textingHoursEnd: organization => organization.texting_hours_end,
+    tagList: async organization =>
+      r
+        .knex("tag")
+        .where({ organization_id: organization.id })
+        .orderBy([
+          { column: "is_system", order: "asc" },
+          { column: "title", order: "asc" }
+        ])
   }
 };

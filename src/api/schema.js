@@ -51,6 +51,7 @@ import {
   resolvers as cannedResponseResolvers
 } from "./canned-response";
 import { schema as inviteSchema, resolvers as inviteResolvers } from "./invite";
+import { schema as tagSchema } from "./tag";
 
 const rootSchema = gql`
   input CampaignContactInput {
@@ -66,6 +67,12 @@ const rootSchema = gql`
     assignmentId: String!
     cell: Phone!
     reason: String
+  }
+
+  input ContactTagActionInput {
+    addedTagIds: [String]!
+    removedTagIds: [String]!
+    message: MessageInput
   }
 
   input QuestionResponseInput {
@@ -212,6 +219,7 @@ const rootSchema = gql`
     conversations(
       cursor: OffsetLimitCursor!
       organizationId: String!
+      tagsFilter: TagsFilter
       campaignsFilter: CampaignsFilter
       assignmentsFilter: AssignmentsFilter
       contactsFilter: ContactsFilter
@@ -275,6 +283,10 @@ const rootSchema = gql`
       message: MessageInput!
       campaignContactId: String!
     ): CampaignContact
+    tagConversation(
+      campaignContactId: String!
+      tag: ContactTagActionInput!
+    ): CampaignContact
     createOptOut(
       optOut: OptOutInput!
       campaignContactId: String!
@@ -320,9 +332,12 @@ const rootSchema = gql`
       organizationId: String!
       campaignsFilter: CampaignsFilter
       assignmentsFilter: AssignmentsFilter
+      tagsFilter: TagsFilter
       contactsFilter: ContactsFilter
       newTexterUserId: String!
     ): [CampaignIdAssignmentId]
+    saveTag(organizationId: String!, tag: TagInput!): Tag!
+    deleteTag(organizationId: String!, tagId: String!): Boolean!
     importCampaignScript(campaignId: String!, url: String!): Int
   }
 
@@ -349,5 +364,6 @@ export const schema = [
   questionResponseSchema,
   questionSchema,
   inviteSchema,
-  conversationSchema
+  conversationSchema,
+  tagSchema
 ];

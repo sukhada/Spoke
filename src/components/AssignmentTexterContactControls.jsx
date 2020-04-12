@@ -22,6 +22,7 @@ import Form from "react-formal";
 import GSSubmitButton from "../components/forms/GSSubmitButton";
 import SendButton from "../components/SendButton";
 import SendButtonArrow from "../components/SendButtonArrow";
+import ApplyTagButton from "../containers/ApplyTagButton";
 import CircularProgress from "material-ui/CircularProgress";
 import Snackbar from "material-ui/Snackbar";
 import {
@@ -367,6 +368,7 @@ export class AssignmentTexterContactControls extends React.Component {
       onFinishContact,
       messageStatusFilter
     } = this.props;
+    console.log(this.props, "actionToolbar");
     const { messageStatus } = contact;
     const size = document.documentElement.clientWidth;
     let navigationToolbar = [];
@@ -458,6 +460,11 @@ export class AssignmentTexterContactControls extends React.Component {
               <RaisedButton
                 label="Other responses"
                 onTouchTap={this.handleOpenPopover}
+              />
+              <ApplyTagButton
+                contactTags={contact.contactTags}
+                allTags={this.props.tags}
+                onApplyTag={this.props.onApplyTag}
               />
               <RaisedButton
                 {...dataTest("optOut")}
