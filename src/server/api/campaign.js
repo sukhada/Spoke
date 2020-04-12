@@ -65,11 +65,7 @@ export function buildCampaignQuery(
 
 export async function getCampaigns(organizationId, cursor, campaignsFilter) {
   let campaignsQuery = buildCampaignQuery(
-    r.knex.select(
-      "campaign.*",
-      "campaign_admin.contacts_count",
-      "campaign_admin.ingest_success"
-    ),
+    r.knex.select("*"),
     organizationId,
     campaignsFilter
   );
@@ -84,12 +80,13 @@ export async function getCampaigns(organizationId, cursor, campaignsFilter) {
       organizationId,
       campaignsFilter
     );
-    console.log("campaignsCountArray", campaignsCountArray[0]);
-    const campaignsCountArray = await campaignsCountQuery;
+
+    const campaignsCount = await r.parseCount(campaignsCountQuery);
+
     const pageInfo = {
       limit: cursor.limit,
       offset: cursor.offset,
-      total: campaignsCountArray[0]["count(*)"]
+      total: campaignsCount
     };
     return {
       campaigns,
