@@ -417,7 +417,6 @@ export class AssignmentTexterContact extends React.Component {
   });
 
   render() {
-    console.log(this.props, "assignmenttextercontact");
     const ControlsComponent = /new=1/.test(document.location.search)
       ? AssignmentTexterContactNewControls
       : AssignmentTexterContactControls;
