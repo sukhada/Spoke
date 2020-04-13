@@ -208,12 +208,7 @@ export async function getConversations(
     tagsFilter,
     contactsFilter
   );
-  console.log(
-    "conversationsCountArray",
-    conversationsCountArray[0],
-    conversationsCountArray[0].count,
-    conversationsCountArray[0]["count"]
-  );
+
   const pageInfo = {
     limit: cursor.limit,
     offset: cursor.offset,
