@@ -128,7 +128,7 @@ app.post(
 
 app.post(
   "/twilio",
-  // twilio.webhook(),
+  twilio.webhook(),
   wrap(async (req, res) => {
     try {
       await twilio.handleIncomingMessage(req.body);
