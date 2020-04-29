@@ -188,12 +188,6 @@ async function sendMessage(message, contact, trx, organization) {
   const subAccountAuthToken = await cacheableData.organization.getSubAccountAuthToken(
     organization
   );
-  log.info(
-    "Sub-account SID",
-    subAccountSid,
-    "sub-account auth token",
-    subAccountAuthToken
-  );
 
   const campaignId = contact.campaign_id;
   if (!campaignIdToMessagingServiceSid[campaignId]) {
