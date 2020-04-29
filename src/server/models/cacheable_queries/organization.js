@@ -15,10 +15,8 @@ const organizationCache = {
     return getConfig("TWILIO_MESSAGE_SERVICE_SID", organization);
   },
   getSubAccountSid: async organization => {
+    // Add a field to organization
     return getConfig("TWILIO_SUB_ACCOUNT_SID", organization);
-  },
-  getSubAccountAuthToken: async organization => {
-    return getConfig("TWILIO_SUB_ACCOUNT_AUTH_TOKEN", organization);
   },
   load: async id => {
     if (r.redis) {
