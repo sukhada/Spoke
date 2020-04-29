@@ -7,35 +7,42 @@ import loadData from "./hoc/load-data";
 import gql from "graphql-tag";
 
 const contactDataFragment = `
-        id
-        assignmentId
-        firstName
-        lastName
-        cell
-        zip
-        customFields
-        optOut {
-          id
-        }
-        questionResponseValues {
-          interactionStepId
-          value
-        }
-        location {
-          city
-          state
-          timezone {
-            offset
-            hasDST
-          }
-        }
-        messageStatus
-        messages {
-          id
-          createdAt
-          text
-          isFromContact
-        }
+  id
+  assignmentId
+  firstName
+  lastName
+  cell
+  zip
+  customFields
+  optOut {
+    id
+  }
+  questionResponseValues {
+    interactionStepId
+    value
+  }
+  location {
+    city
+    state
+    timezone {
+      offset
+      hasDST
+    }
+  }
+  messageStatus
+  messages {
+    id
+    createdAt
+    text
+    isFromContact
+  }
+  contactTags {
+    id
+    title
+    description
+    isAssignable
+    isSystem
+  }
 `;
 
 export const dataQuery = gql`

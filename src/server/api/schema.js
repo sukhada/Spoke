@@ -6,6 +6,7 @@ import { organizationCache } from "../models/cacheable_queries/organization";
 
 import { gzip, makeTree } from "../../lib";
 import { capitalizeWord } from "./lib/utils";
+import { notifyOnTagConversation } from "./lib/alerts";
 import {
   assignTexters,
   dispatchContactIngestLoad,
@@ -56,6 +57,7 @@ import { GraphQLPhone } from "./phone";
 import { resolvers as questionResolvers } from "./question";
 import { resolvers as questionResponseResolvers } from "./question-response";
 import { getUsers, resolvers as userResolvers } from "./user";
+import { resolvers as tagResolvers } from "./tag";
 import { change } from "../local-auth-helpers";
 
 import {
@@ -977,6 +979,54 @@ const rootMutations = {
     ) => {
       return await findNewCampaignContact(assignmentId, numberContacts, user);
     },
+    tagConversation: async (_, { campaignContactId, tag }, { user }) => {
+      const campaignContact = await r
+        .knex("campaign_contact")
+        .where({ id: campaignContactId })
+        .first();
+      await assignmentRequired(user, campaignContact.assignment_id);
+
+      const { addedTagIds, removedTagIds } = tag;
+      const tagsToInsert = addedTagIds.map(tagId => ({
+        campaign_contact_id: campaignContactId,
+        tag_id: tagId,
+        tagger_id: user.id
+      }));
+      const [deleteResult, insertResult] = await Promise.all([
+        await r
+          .knex("campaign_contact_tag")
+          .where({ campaign_contact_id: campaignContactId })
+          .whereIn("tag_id", removedTagIds)
+          .del(),
+        await r.knex("campaign_contact_tag").insert(tagsToInsert)
+      ]);
+
+      if (tag.message) {
+        try {
+          const checkOptOut = true;
+          const checkAssignment = false;
+          await sendMessage(
+            user,
+            campaignContactId,
+            tag.message,
+            checkOptOut,
+            checkAssignment
+          );
+        } catch (error) {
+          // Log the sendMessage error, but return successful opt out creation
+          log.error(error);
+        }
+      }
+
+      const webhookUrls = await r
+        .knex("tag")
+        .whereIn("id", addedTagIds)
+        .pluck("webhook_url")
+        .then(urls => urls.filter(url => url.length > 0));
+      await notifyOnTagConversation(campaignContactId, user.id, webhookUrls);
+
+      return campaignContact;
+    },
 
     createOptOut: async (
       _,
@@ -1166,6 +1216,56 @@ const rootMutations = {
         newTexterUserId
       );
     },
+    saveTag: async (_, { organizationId, tag }, { user }) => {
+      await accessRequired(user, organizationId, "ADMIN");
+      console.log(organizationId, tag, "IN THE SERVER DUMMY");
+      // Update existing tag
+      if (tag.id) {
+        const [updatedTag] = await r
+          .knex("tag")
+          .update({
+            title: tag.title,
+            description: tag.description,
+            is_assignable: tag.isAssignable
+          })
+          .where({
+            id: tag.id,
+            organization_id: organizationId,
+            is_system: false
+          })
+          .returning("*");
+        if (!updatedTag) throw new Error("No matching tag to update!");
+        return updatedTag;
+      }
+
+      // Create new tag
+      const [newTag] = await r
+        .knex("tag")
+        .insert({
+          organization_id: organizationId,
+          author_id: user.id,
+          title: tag.title,
+          description: tag.description,
+          is_assignable: tag.isAssignable
+        })
+        .returning("*");
+      return newTag;
+    },
+    deleteTag: async (_, { organizationId, tagId }, { user }) => {
+      await accessRequired(user, organizationId, "ADMIN");
+
+      const deleteCount = await r
+        .knex("tag")
+        .where({
+          id: tagId,
+          organization_id: organizationId,
+          is_system: false
+        })
+        .del();
+      if (deleteCount !== 1) throw new Error("Could not delete the tag.");
+
+      return true;
+    },
     importCampaignScript: async (_, { campaignId, url }, { loaders }) => {
       const campaign = await loaders.campaign.load(campaignId);
       if (campaign.is_started || campaign.is_archived) {
@@ -1290,6 +1390,7 @@ const rootResolvers = {
         organizationId,
         campaignsFilter,
         assignmentsFilter,
+        tagsFilter,
         contactsFilter,
         utc
       },
@@ -1302,6 +1403,7 @@ const rootResolvers = {
         organizationId,
         campaignsFilter,
         assignmentsFilter,
+        tagsFilter,
         contactsFilter,
         utc
       );
@@ -1330,6 +1432,7 @@ export const resolvers = {
   ...userResolvers,
   ...organizationResolvers,
   ...campaignResolvers,
+  ...tagResolvers,
   ...assignmentResolvers,
   ...interactionStepResolvers,
   ...optOutResolvers,

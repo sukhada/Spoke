@@ -52,6 +52,16 @@ if (!process.env.SUPPRESS_DATABASE_AUTOCREATE) {
 
 setupUserNotificationObservers();
 const app = express();
+
+// redirect to HTTPS if using HTTP
+if (process.env.NODE_ENV === "production") {
+  app.use((req, res, next) => {
+    if (req.header("x-forwarded-proto") !== "https")
+      res.redirect(`https://${req.header("host")}${req.url}`);
+    else next();
+  });
+}
+
 // Heroku requires you to use process.env.PORT
 const port = process.env.DEV_APP_PORT || process.env.PORT;
 

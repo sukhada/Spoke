@@ -1,12 +1,17 @@
 import PropTypes from "prop-types";
 import React from "react";
 import IconButton from "material-ui/IconButton/IconButton";
+import loadData from "../containers/hoc/load-data";
+import wrapMutations from "../containers/hoc/wrap-mutations";
 import LoadingIndicator from "./LoadingIndicator";
 import { StyleSheet, css } from "aphrodite";
 import { withRouter } from "react-router";
+import gql from "graphql-tag";
 import Check from "material-ui/svg-icons/action/check-circle";
 import Empty from "../components/Empty";
 import RaisedButton from "material-ui/RaisedButton";
+
+const SEND_DELAY = 100;
 
 const styles = StyleSheet.create({
   container: {
@@ -343,8 +348,106 @@ export class AssignmentTexter extends React.Component {
     };
   }
 
+  handleSendMessageError = contact_id => e => {
+    let error = { id: contact_id };
+
+    if (e.status === 402) {
+      this.goBackToTodos();
+    } else {
+      error.snackbarError = e.message;
+
+      if (e.message.includes("Your assignment has changed")) {
+        error.snackbarActionTitle = "Back to todos";
+        error.snackbarOnTouchTap = this.goBackToTodos;
+      } else if (
+        e.message.includes(
+          "Skipped sending because this contact was already opted out"
+        )
+      ) {
+        // opt out or send message Error
+        error.snackbarActionTitle = "A previous contact had been opted out";
+      } else {
+        error.snackbarError = "Error: Please wait a few seconds and try again.";
+      }
+
+      error.snackbarError = `Error for contact ${contact_id}: ${error.snackbarError.replace(
+        "Error: GraphQL error:",
+        ""
+      )}`;
+
+      this.setState({ errors: this.state.errors.concat([error]) });
+
+      setTimeout(() => {
+        this.setState({
+          errors: this.state.errors.filter(e => e.id !== contact_id)
+        });
+      }, 2000);
+
+      throw e;
+    }
+  };
+
+  sendMessage = (contact_id, payload) => {
+    const isLastOne = !this.hasNext();
+
+    const promises = [];
+
+    const catchError = response => {
+      if (response.errors) {
+        throw new Error(response.errors);
+      }
+      return response;
+    };
+
+    if (payload.message)
+      promises.push(
+        this.props.mutations
+          .sendMessage(payload.message, contact_id)
+          .then(catchError)
+          .catch(this.handleSendMessageError(contact_id))
+      );
+
+    if (payload.questionResponseObjects)
+      promises.push(
+        this.props.mutations
+          .updateQuestionResponses(payload.questionResponseObjects, contact_id)
+          .then(catchError)
+      );
+
+    if (payload.deletionIds)
+      promises.push(
+        this.props.mutations
+          .deleteQuestionResponses(payload.deletionIds, contact_id)
+          .then(catchError)
+      );
+
+    if (payload.optOut) {
+      promises.push(
+        this.props.mutations
+          .createOptOut(payload.optOut, contact_id)
+          .then(catchError)
+      );
+    }
+
+    if (payload.tag) {
+      promises.push(
+        this.props.mutations
+          .tagContact(contact_id, payload.tag)
+          .then(catchError)
+      );
+    }
+
+    Promise.all(promises).then(_ => {
+      if (isLastOne) this.handleFinishContact();
+    });
+
+    if (!isLastOne) {
+      setTimeout(() => this.handleFinishContact(), SEND_DELAY);
+    }
+  };
+
   renderTexter() {
-    const { assignment, ChildComponent } = this.props;
+    const { assignment, ChildComponent, organizationTags } = this.props;
     const { campaign, texter } = assignment;
     const contact = this.currentContact();
     const navigationToolbarChildren = this.getNavigationToolbarChildren();
@@ -409,6 +512,7 @@ export class AssignmentTexter extends React.Component {
         assignment={assignment}
         campaignContactId={contact.id}
         contact={contactData}
+        tags={organizationTags.organization.tagList}
         texter={texter}
         campaign={campaign}
         navigationToolbarChildren={navigationToolbarChildren}
@@ -416,6 +520,8 @@ export class AssignmentTexter extends React.Component {
         refreshData={this.props.refreshData}
         onExitTexter={this.handleExitTexter}
         messageStatusFilter={this.props.messageStatusFilter}
+        organizationId={this.props.organizationId}
+        sendMessage={this.sendMessage}
       />
     );
   }
@@ -459,4 +565,165 @@ AssignmentTexter.propTypes = {
   messageStatusFilter: PropTypes.string
 };
 
-export default withRouter(AssignmentTexter);
+const mapQueriesToProps = ({ ownProps }) => ({
+  organizationTags: {
+    query: gql`
+      query getTags($organizationId: String!) {
+        organization(id: $organizationId) {
+          id
+          tagList {
+            id
+            title
+            description
+            confirmationSteps
+            onApplyScript
+            isSystem
+            isAssignable
+          }
+        }
+      }
+    `,
+    variables: {
+      organizationId: ownProps.organizationId
+    },
+    forceFetch: true
+  }
+});
+
+const mapMutationsToProps = () => ({
+  createOptOut: (optOut, campaignContactId) => ({
+    mutation: gql`
+      mutation createOptOut(
+        $optOut: ContactActionInput!
+        $campaignContactId: String!
+      ) {
+        createOptOut(optOut: $optOut, campaignContactId: $campaignContactId) {
+          id
+          optOut {
+            id
+            cell
+          }
+        }
+      }
+    `,
+    variables: {
+      optOut,
+      campaignContactId
+    }
+  }),
+  tagContact: (campaignContactId, tag) => ({
+    mutation: gql`
+      mutation tagConversation(
+        $campaignContactId: String!
+        $tag: ContactTagActionInput!
+      ) {
+        tagConversation(campaignContactId: $campaignContactId, tag: $tag) {
+          id
+          assignmentId
+        }
+      }
+    `,
+    variables: {
+      campaignContactId,
+      tag
+    }
+  }),
+  editCampaignContactMessageStatus: (messageStatus, campaignContactId) => ({
+    mutation: gql`
+      mutation editCampaignContactMessageStatus(
+        $messageStatus: String!
+        $campaignContactId: String!
+      ) {
+        editCampaignContactMessageStatus(
+          messageStatus: $messageStatus
+          campaignContactId: $campaignContactId
+        ) {
+          id
+          messageStatus
+        }
+      }
+    `,
+    variables: {
+      messageStatus,
+      campaignContactId
+    }
+  }),
+  deleteQuestionResponses: (interactionStepIds, campaignContactId) => ({
+    mutation: gql`
+      mutation deleteQuestionResponses(
+        $interactionStepIds: [String]
+        $campaignContactId: String!
+      ) {
+        deleteQuestionResponses(
+          interactionStepIds: $interactionStepIds
+          campaignContactId: $campaignContactId
+        ) {
+          id
+        }
+      }
+    `,
+    variables: {
+      interactionStepIds,
+      campaignContactId
+    }
+  }),
+  updateQuestionResponses: (questionResponses, campaignContactId) => ({
+    mutation: gql`
+      mutation updateQuestionResponses(
+        $questionResponses: [QuestionResponseInput]
+        $campaignContactId: String!
+      ) {
+        updateQuestionResponses(
+          questionResponses: $questionResponses
+          campaignContactId: $campaignContactId
+        ) {
+          id
+        }
+      }
+    `,
+    variables: {
+      questionResponses,
+      campaignContactId
+    }
+  }),
+  sendMessage: (message, campaignContactId) => ({
+    mutation: gql`
+      mutation sendMessage(
+        $message: MessageInput!
+        $campaignContactId: String!
+      ) {
+        sendMessage(message: $message, campaignContactId: $campaignContactId) {
+          id
+          messageStatus
+          messages {
+            id
+            createdAt
+            text
+            isFromContact
+          }
+        }
+      }
+    `,
+    variables: {
+      message,
+      campaignContactId
+    }
+  }),
+  bulkSendMessages: assignmentId => ({
+    mutation: gql`
+      mutation bulkSendMessages($assignmentId: Int!) {
+        bulkSendMessages(assignmentId: $assignmentId) {
+          id
+        }
+      }
+    `,
+    variables: {
+      assignmentId
+    }
+  })
+});
+
+export default loadData(wrapMutations(withRouter(AssignmentTexter)), {
+  mapQueriesToProps,
+  mapMutationsToProps
+});

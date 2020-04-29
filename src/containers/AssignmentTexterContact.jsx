@@ -1,6 +1,8 @@
 import PropTypes from "prop-types";
 import React from "react";
 import { StyleSheet, css } from "aphrodite";
+import sample from "lodash/sample";
+import sortBy from "lodash/sortBy";
 import MessageList from "../components/MessageList";
 import CannedResponseMenu from "../components/CannedResponseMenu";
 import AssignmentTexterSurveys from "../components/AssignmentTexterSurveys";
@@ -39,6 +41,7 @@ import Empty from "../components/Empty";
 import CreateIcon from "material-ui/svg-icons/content/create";
 import { dataTest } from "../lib/attributes";
 import { getContactTimezone } from "../lib/timezones";
+import ApplyTagButton from "./ApplyTagButton";
 
 const styles = StyleSheet.create({
   overlay: {
@@ -97,7 +100,10 @@ export class AssignmentTexterContact extends React.Component {
       // this prevents jitter by not showing the optout/skip buttons right after sending
       snackbarError,
       snackbarActionTitle,
-      snackbarOnTouchTap
+      snackbarOnTouchTap,
+      tagMessageText: "",
+      addedTags: [],
+      removedTags: []
     };
 
     this.setDisabled = this.setDisabled.bind(this);
@@ -117,6 +123,16 @@ export class AssignmentTexterContact extends React.Component {
 
   setDisabled = async (disabled = true) => {
     this.setState({ disabled });
+  };
+
+  getStartingMessageText = () => {
+    const { contact, campaign } = this.props;
+    if (contact.messageStatus === "needsMessage") {
+      const { scriptOptions } = getTopMostParent(campaign.interactionSteps);
+      const randomScript = sample(scriptOptions);
+      return this.getMessageTextFromScript(randomScript);
+    }
+    return "";
   };
 
   getMessageTextFromScript = script => {
@@ -177,22 +193,40 @@ export class AssignmentTexterContact extends React.Component {
     }
   };
 
-  handleMessageFormSubmit = async ({ messageText }) => {
-    try {
-      const { contact } = this.props;
-      const message = this.createMessageToContact(messageText);
-      if (this.state.disabled) {
-        return; // stops from multi-send
-      }
-      this.setState({ disabled: true });
-      console.log("sendMessage", contact.id);
-      await this.props.mutations.sendMessage(message, contact.id);
-
-      await this.handleSubmitSurveys();
-      this.props.onFinishContact(contact.id);
-    } catch (e) {
-      this.handleSendMessageError(e);
+  handleMessageFormSubmit = ({ messageText }) => {
+    // Process the submit synchronously
+    if (this.state.alreadySent || this.state.disabled) {
+      return; // stops from multi-send
     }
+    this.setState({ disabled: true, alreadySent: true }, () => {
+      // Actually deliver the payload asyncronously
+      this.submitAction(messageText);
+    });
+  };
+
+  submitAction = async messageText => {
+    const { contact } = this.props;
+    const message = this.createMessageToContact(messageText);
+    const changes = this.gatherSurveyAndTagChanges();
+    const payload = Object.assign({ message }, changes);
+    this.props.sendMessage(contact.id, payload);
+  };
+
+  gatherSurveyAndTagChanges = () => {
+    const { contact } = this.props;
+    const { addedTags, removedTags } = this.state;
+
+    const changes = {};
+
+    // Gather tag changes
+    const tag = {
+      addedTagIds: addedTags.map(tag => tag.id),
+      removedTagIds: removedTags.map(tag => tag.id)
+    };
+    if (tag.addedTagIds || tag.removedTagIds) changes.tag = tag;
+
+    // Return aggregate changes
+    return changes;
   };
 
   handleQuestionResponseChange = ({ questionResponses }) => {
@@ -266,6 +300,23 @@ export class AssignmentTexterContact extends React.Component {
     if (finishContact) {
       await this.handleSubmitSurveys();
       this.props.onFinishContact();
+    }
+  };
+
+  handleChangeScript = newScript => {
+    const messageText = this.getMessageTextFromScript(newScript);
+
+    this.setState({
+      messageText
+    });
+  };
+
+  handleApplyTags = (addedTags, removedTags) => {
+    this.setState({ addedTags, removedTags });
+    if (addedTags.length > 0) {
+      const mostImportantTag = sortBy(addedTags, "id")[0];
+      const tagMessageText = mostImportantTag.onApplyScript;
+      this.handleChangeScript(tagMessageText);
     }
   };
 
@@ -394,6 +445,8 @@ export class AssignmentTexterContact extends React.Component {
           onExitTexter={this.props.onExitTexter}
           onEditStatus={this.handleEditStatus}
           getMessageTextFromScript={this.getMessageTextFromScript}
+          tags={this.props.tags}
+          onApplyTag={this.handleApplyTags}
         />
         {this.props.contact.messageStatus === "needsMessage" &&
         window.NOT_IN_USA &&
@@ -422,6 +475,7 @@ export class AssignmentTexterContact extends React.Component {
 
 AssignmentTexterContact.propTypes = {
   contact: PropTypes.object,
+  tags: PropTypes.arrayOf(PropTypes.object).isRequired,
   campaign: PropTypes.object,
   assignment: PropTypes.object,
   texter: PropTypes.object,
@@ -434,132 +488,4 @@ AssignmentTexterContact.propTypes = {
   messageStatusFilter: PropTypes.string
 };
 
-const mapMutationsToProps = () => ({
-  createOptOut: (optOut, campaignContactId) => ({
-    mutation: gql`
-      mutation createOptOut(
-        $optOut: OptOutInput!
-        $campaignContactId: String!
-      ) {
-        createOptOut(optOut: $optOut, campaignContactId: $campaignContactId) {
-          id
-          optOut {
-            id
-            createdAt
-          }
-        }
-      }
-    `,
-    variables: {
-      optOut,
-      campaignContactId
-    }
-  }),
-  createCannedResponse: cannedResponse => ({
-    mutation: gql`
-      mutation createCannedResponse($cannedResponse: CannedResponseInput!) {
-        createCannedResponse(cannedResponse: $cannedResponse) {
-          id
-        }
-      }
-    `,
-    variables: { cannedResponse }
-  }),
-  editCampaignContactMessageStatus: (messageStatus, campaignContactId) => ({
-    mutation: gql`
-      mutation editCampaignContactMessageStatus(
-        $messageStatus: String!
-        $campaignContactId: String!
-      ) {
-        editCampaignContactMessageStatus(
-          messageStatus: $messageStatus
-          campaignContactId: $campaignContactId
-        ) {
-          id
-          messageStatus
-        }
-      }
-    `,
-    variables: {
-      messageStatus,
-      campaignContactId
-    }
-  }),
-  deleteQuestionResponses: (interactionStepIds, campaignContactId) => ({
-    mutation: gql`
-      mutation deleteQuestionResponses(
-        $interactionStepIds: [String]
-        $campaignContactId: String!
-      ) {
-        deleteQuestionResponses(
-          interactionStepIds: $interactionStepIds
-          campaignContactId: $campaignContactId
-        ) {
-          id
-        }
-      }
-    `,
-    variables: {
-      interactionStepIds,
-      campaignContactId
-    }
-  }),
-  updateQuestionResponses: (questionResponses, campaignContactId) => ({
-    mutation: gql`
-      mutation updateQuestionResponses(
-        $questionResponses: [QuestionResponseInput]
-        $campaignContactId: String!
-      ) {
-        updateQuestionResponses(
-          questionResponses: $questionResponses
-          campaignContactId: $campaignContactId
-        ) {
-          id
-        }
-      }
-    `,
-    variables: {
-      questionResponses,
-      campaignContactId
-    }
-  }),
-  sendMessage: (message, campaignContactId) => ({
-    mutation: gql`
-      mutation sendMessage(
-        $message: MessageInput!
-        $campaignContactId: String!
-      ) {
-        sendMessage(message: $message, campaignContactId: $campaignContactId) {
-          id
-          messageStatus
-          messages {
-            id
-            createdAt
-            text
-            isFromContact
-          }
-        }
-      }
-    `,
-    variables: {
-      message,
-      campaignContactId
-    }
-  }),
-  bulkSendMessages: assignmentId => ({
-    mutation: gql`
-      mutation bulkSendMessages($assignmentId: Int!) {
-        bulkSendMessages(assignmentId: $assignmentId) {
-          id
-        }
-      }
-    `,
-    variables: {
-      assignmentId
-    }
-  })
-});
-
-export default loadData(wrapMutations(withRouter(AssignmentTexterContact)), {
-  mapMutationsToProps
-});
+export default withRouter(AssignmentTexterContact);

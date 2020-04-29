@@ -7,6 +7,7 @@ import CannedResponseMenu from "../components/CannedResponseMenu";
 import AssignmentTexterSurveys from "../components/AssignmentTexterSurveys";
 import Empty from "../components/Empty";
 import GSForm from "../components/forms/GSForm";
+import ApplyTagButton from "../containers/ApplyTagButton";
 import RaisedButton from "material-ui/RaisedButton";
 import FlatButton from "material-ui/FlatButton";
 import NavigateHomeIcon from "material-ui/svg-icons/action/home";
@@ -792,7 +793,11 @@ export class AssignmentTexterContactControls extends React.Component {
               labelStyle={inlineStyles.flatButtonLabel}
               backgroundColor="white"
             />
-
+            <ApplyTagButton
+              contactTags={contact.contactTags}
+              allTags={this.props.tags}
+              onApplyTag={this.props.onApplyTag}
+            />
             <FlatButton
               onTouchTap={this.props.navigationToolbarChildren.onNext}
               disabled={!this.props.navigationToolbarChildren.onNext}

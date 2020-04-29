@@ -53,11 +53,6 @@ export function buildCampaignQuery(
   }
 
   query = query.where("campaign.organization_id", organizationId);
-  query = query.leftJoin(
-    "campaign_admin",
-    "campaign_admin.campaign_id",
-    "campaign.id"
-  );
   query = addCampaignsFilterToQuery(query, campaignsFilter);
 
   return query;
@@ -65,11 +60,7 @@ export function buildCampaignQuery(
 
 export async function getCampaigns(organizationId, cursor, campaignsFilter) {
   let campaignsQuery = buildCampaignQuery(
-    r.knex.select(
-      "campaign.*",
-      "campaign_admin.contacts_count",
-      "campaign_admin.ingest_success"
-    ),
+    r.knex.select("*"),
     organizationId,
     campaignsFilter
   );
@@ -85,12 +76,12 @@ export async function getCampaigns(organizationId, cursor, campaignsFilter) {
       campaignsFilter
     );
 
-    const campaignsCountArray = await campaignsCountQuery;
+    const campaignsCount = await r.parseCount(campaignsCountQuery);
 
     const pageInfo = {
       limit: cursor.limit,
       offset: cursor.offset,
-      total: campaignsCountArray[0].count
+      total: campaignsCount
     };
     return {
       campaigns,

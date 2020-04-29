@@ -57,18 +57,35 @@ function getContactsFilterForConversationOptOutStatus(
   return {};
 }
 
+/* Initialized as objects to later facillitate shallow comparison */
+const initialCampaignsFilter = { isArchived: false };
+const initialContactsFilter = { isOptedOut: false };
+const initialAssignmentsFilter = {};
+const initialTagsFilter = {
+  excludeEscalated: false,
+  escalatedConvosOnly: false
+};
+
 export class AdminIncomingMessageList extends Component {
   constructor(props) {
     super(props);
 
+    const tagsFilter = props.escalatedConvosOnly
+      ? Object.assign({}, initialTagsFilter, {
+          excludeEscalated: false,
+          escalatedConvosOnly: true
+        })
+      : initialTagsFilter;
+
     this.state = {
       page: 0,
       pageSize: 10,
-      campaignsFilter: { isArchived: false },
-      contactsFilter: { isOptedOut: false },
-      assignmentsFilter: {},
+      campaignsFilter: initialCampaignsFilter,
+      contactsFilter: initialContactsFilter,
+      assignmentsFilter: initialAssignmentsFilter,
+      tagsFilter: tagsFilter,
+      contactNameFilter: undefined,
       needsRender: false,
-      utc: Date.now().toString(),
       campaigns: [],
       reassignmentTexters: [],
       campaignTexters: [],
@@ -77,7 +94,9 @@ export class AdminIncomingMessageList extends Component {
       includeActiveCampaigns: true,
       includeNotOptedOutConversations: true,
       includeOptedOutConversations: false,
-      clearSelectedMessages: false
+      selectedRows: [],
+      campaignIdsContactIds: [],
+      reassignmentAlert: undefined
     };
   }
 
@@ -86,7 +105,8 @@ export class AdminIncomingMessageList extends Component {
       !nextState.needsRender &&
       _.isEqual(this.state.contactsFilter, nextState.contactsFilter) &&
       _.isEqual(this.state.campaignsFilter, nextState.campaignsFilter) &&
-      _.isEqual(this.state.assignmentsFilter, nextState.assignmentsFilter)
+      _.isEqual(this.state.assignmentsFilter, nextState.assignmentsFilter) &&
+      _.isEqual(this.state.tagsFilter, nextState, tagsFilter)
     ) {
       return false;
     }
@@ -126,6 +146,14 @@ export class AdminIncomingMessageList extends Component {
       assignmentsFilter,
       needsRender: true
     });
+  };
+
+  handleIncludeEscalatedToggled = () => {
+    const tagsFilter = Object.assign({}, this.state.tagsFilter);
+    tagsFilter.excludeEscalated = !(
+      tagsFilter && !!tagsFilter.excludeEscalated
+    );
+    this.setState({ tagsFilter });
   };
 
   handleMessageFilterChange = async messagesFilter => {
@@ -298,6 +326,8 @@ export class AdminIncomingMessageList extends Component {
       offset: this.state.page * this.state.pageSize,
       limit: this.state.pageSize
     };
+    const includeEscalated =
+      this.state.tagsFilter && !this.state.tagsFilter.excludeEscalated;
     return (
       <div>
         <h3> Message Review </h3>
@@ -328,6 +358,8 @@ export class AdminIncomingMessageList extends Component {
               onCampaignChanged={this.handleCampaignChanged}
               onTexterChanged={this.handleTexterChanged}
               onMessageFilterChanged={this.handleMessageFilterChange}
+              includeEscalated={includeEscalated}
+              onIncludeEscalatedChanged={this.handleIncludeEscalatedToggled}
               assignmentsFilter={this.state.assignmentsFilter}
               onActiveCampaignsToggled={this.handleActiveCampaignsToggled}
               onArchivedCampaignsToggled={this.handleArchivedCampaignsToggled}
@@ -362,6 +394,7 @@ export class AdminIncomingMessageList extends Component {
               contactsFilter={this.state.contactsFilter}
               campaignsFilter={this.state.campaignsFilter}
               assignmentsFilter={this.state.assignmentsFilter}
+              tagsFilter={this.state.tagsFilter}
               utc={this.state.utc}
               onPageChanged={this.handlePageChange}
               onPageSizeChanged={this.handlePageSizeChange}
@@ -404,6 +437,7 @@ export const bulkReassignCampaignContactsMutation = gql`
     $contactsFilter: ContactsFilter
     $campaignsFilter: CampaignsFilter
     $assignmentsFilter: AssignmentsFilter
+    $tagsFilter: tagsFilter
     $newTexterUserId: String!
   ) {
     bulkReassignCampaignContacts(
@@ -411,6 +445,7 @@ export const bulkReassignCampaignContactsMutation = gql`
       contactsFilter: $contactsFilter
       campaignsFilter: $campaignsFilter
       assignmentsFilter: $assignmentsFilter
+      tagsFilter: $tagsFilter
       newTexterUserId: $newTexterUserId
     ) {
       campaignId
@@ -449,6 +484,7 @@ const mapMutationsToProps = () => ({
     organizationId,
     campaignsFilter,
     assignmentsFilter,
+    tagsFilter,
     contactsFilter,
     newTexterUserId
   ) => ({
@@ -457,6 +493,7 @@ const mapMutationsToProps = () => ({
       organizationId,
       campaignsFilter,
       assignmentsFilter,
+      tagsFilter,
       contactsFilter,
       newTexterUserId
     }

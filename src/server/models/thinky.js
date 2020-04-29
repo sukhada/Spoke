@@ -26,6 +26,26 @@ thinkyConn.r.getCountDistinct = async (query, distinctConstraint) =>
     (await query.countDistinct(distinctConstraint + " as count").first()).count
   );
 
+/**
+ * Helper method to parse the result of a knex `count` query (see above).
+ */
+thinkyConn.r.parseCount = async query => {
+  if (Array.isArray(query)) {
+    return query.length;
+  }
+
+  const result = (await query)[0];
+  const keys = Object.keys(result);
+  if (keys.length === 1) {
+    const countKey = keys[0];
+    // Note that in Postgres, count returns a bigint type which will be a String and not a Number
+    // -- https://knexjs.org/#Builder-count
+    return parseInt(result[countKey], 10);
+  }
+
+  throw new Error("Multiple columns returned by the query!");
+};
+
 if (process.env.REDIS_URL) {
   thinkyConn.r.redis = redis.createClient({ url: process.env.REDIS_URL });
 } else if (process.env.REDIS_FAKE) {
