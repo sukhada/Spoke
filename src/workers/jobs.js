@@ -887,10 +887,7 @@ export async function sendMessages(queryFunc, defaultStatus) {
           let campaign = await cacheableData.campaign.load(
             campaignContact.campaign_id
           );
-          let organization = await cacheableData.organization.load(
-            campaign.organization_id
-          );
-          await service.sendMessage(message, null, trx, organization);
+          await service.sendMessage(message, null, trx, campaign);
           pastMessages.push(message.id);
           pastMessages = pastMessages.slice(-100); // keep the last 100
         } catch (err) {
