@@ -178,14 +178,11 @@ async function sendMessage(message, contact, trx, organization) {
   }
 
   // Note organization won't always be available, so then contact can trace to it
-  // const messagingServiceSid = await cacheableData.organization.getMessageServiceSid(
-  //   organization,
-  //   contact
-  // );
-  if (!organization) {
-    const campaign = await Campaign.get(contact.campaign_id);
-    organization = await Organization.get(campaign.organization_id);
-  }
+  const messagingServiceSid = await cacheableData.organization.getMessageServiceSid(
+    organization,
+    contact
+  );
+
   const subAccountSid = await cacheableData.organization.getSubAccountSid(
     organization
   );
@@ -203,7 +200,7 @@ async function sendMessage(message, contact, trx, organization) {
 
   const campaignId = contact.campaign_id;
   if (!campaignIdToMessagingServiceSid[campaignId]) {
-    let campaign = await Campaign.get(campaignId);
+    const campaign = await Campaign.get(campaignId);
     campaignIdToMessagingServiceSid[campaignId] =
       campaign.messaging_service_sid;
   }
